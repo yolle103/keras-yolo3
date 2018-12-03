@@ -18,6 +18,10 @@ from yolo3.utils import letterbox_image
 import os
 from keras.utils import multi_gpu_model
 
+# LUCAS KANADE
+from LucasKanade import LucasKanade
+from skimage import color
+
 class YOLO(object):
     _defaults = {
         "model_path": 'model_data/yolo.h5',
@@ -125,7 +129,12 @@ class YOLO(object):
             })
 
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
+        end = timer()
+        print(end - start)
 
+        return out_boxes, out_scores, out_classes
+
+    def draw_box(self, out_boxes, out_scores, out_classes, image):
         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
                     size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
         thickness = (image.size[0] + image.size[1]) // 300
@@ -162,14 +171,26 @@ class YOLO(object):
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
 
-        end = timer()
-        print(end - start)
         return image
+
+    def LK_detect(self, pre_frame, cur_frame, rect):
+        bw_preframe = color.rgb2gray(pre_frame)
+        bw_curframe = color.rgb2gray(cur_frame)
+        # print(bw_preframe.shape, bw_curframe.shape, rect, 'LK')
+        p = LucasKanade(bw_preframe, bw_curframe, rect)
+        left, top, right, bottom = rect
+        left    += p[0]
+        right   += p[0]
+        top     += p[1]
+        bottom  += p[1]
+        bounding_box = np.asarray([left, top, right, bottom])
+        bounding_box = bounding_box.reshape((1, 4))
+        return bounding_box
 
     def close_session(self):
         self.sess.close()
 
-def detect_video(yolo, video_path, output_path=""):
+def detect_video(yolo, video_path, output_path="", detect_target='apple'):
     import cv2
     vid = cv2.VideoCapture(video_path)
     if not vid.isOpened():
@@ -186,11 +207,39 @@ def detect_video(yolo, video_path, output_path=""):
     curr_fps = 0
     fps = "FPS: ??"
     prev_time = timer()
+    pre_frame = None
+    pre_box = None
+    save_count = 0
     while True:
         return_value, frame = vid.read()
         image = Image.fromarray(frame)
-        image = yolo.detect_image(image)
+        out_boxes, out_scores, out_classes = yolo.detect_image(image)
+        detect_classes = [yolo.class_names[x] for x in out_classes]
+        print('origin output of YOLO', out_boxes, out_boxes.shape)
+        print('origin scores of YOLO', out_scores, out_scores.shape)
+        print('origin classes of YOLO', out_classes, out_classes.shape)
+
+        if not detect_target in detect_classes:
+            # print(pre_frame.shape)
+            if pre_frame is not None:
+                # run lucas kanede
+                LK_boxes = yolo.LK_detect(pre_frame, frame, pre_box)
+                # TODO need optimization
+                # print(f'shape match? {out_boxes.shape}, {LK_boxes.shape}')
+                out_boxes = np.append(out_boxes, LK_boxes, axis=0)
+                out_scores = np.append(out_scores, np.asarray([2]), axis=0)
+                out_classes = np.append(out_classes, np.asarray([47]), axis=0)
+                print(f'finish LK, {out_boxes}')
+                detect_classes = [yolo.class_names[x] for x in out_classes]
+
+        image = yolo.draw_box(out_boxes, out_scores, out_classes, image)
         result = np.asarray(image)
+        cv2.imwrite(f'temp/{save_count}.jpg', result)
+        save_count += 1
+        # set pre frame
+        pre_frame = frame
+        pre_box = out_boxes[detect_classes.index('apple')]
+
         curr_time = timer()
         exec_time = curr_time - prev_time
         prev_time = curr_time

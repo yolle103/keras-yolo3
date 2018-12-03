@@ -3,6 +3,9 @@ import argparse
 from yolo import YOLO, detect_video
 from PIL import Image
 
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
 def detect_img(yolo):
     while True:
         img = input('Input image filename:')
