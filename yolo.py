@@ -193,7 +193,7 @@ class YOLO(object):
     def close_session(self):
         self.sess.close()
 
-def detect_video(yolo, video_path, output_path="", detect_target='apple'):
+def detect_video(yolo, video_path, output_path="", detect_targets=[47, 65]):
     import cv2
     vid = cv2.VideoCapture(video_path)
     if not vid.isOpened():
@@ -217,23 +217,22 @@ def detect_video(yolo, video_path, output_path="", detect_target='apple'):
         return_value, frame = vid.read()
         image = Image.fromarray(frame)
         out_boxes, out_scores, out_classes = yolo.detect_image(image)
-        detect_classes = [yolo.class_names[x] for x in out_classes]
         print('origin output of YOLO', out_boxes, out_boxes.shape)
         print('origin scores of YOLO', out_scores, out_scores.shape)
         print('origin classes of YOLO', out_classes, out_classes.shape)
 
-        if not detect_target in detect_classes:
-            # print(pre_frame.shape)
-            if pre_frame is not None:
-                # run lucas kanede
-                LK_boxes = yolo.LK_detect(pre_frame, frame, pre_box)
-                # TODO need optimization
-                # print(f'shape match? {out_boxes.shape}, {LK_boxes.shape}')
-                out_boxes = np.append(out_boxes, LK_boxes, axis=0)
-                out_scores = np.append(out_scores, np.asarray([-1]), axis=0)
-                out_classes = np.append(out_classes, np.asarray([47]), axis=0)
-                print(f'finish LK, {out_boxes}')
-                detect_classes = [yolo.class_names[x] for x in out_classes]
+        for i, detect_target in enumerate(detect_targets):
+            if not detect_target in out_classes:
+                # print(pre_frame.shape)
+                if pre_frame is not None:
+                    # run lucas kanede
+                    LK_boxes = yolo.LK_detect(pre_frame, frame, pre_boxes[i])
+                    # TODO need optimization
+                    # print(f'shape match? {out_boxes.shape}, {LK_boxes.shape}')
+                    out_boxes = np.append(out_boxes, LK_boxes, axis=0)
+                    out_scores = np.append(out_scores, np.asarray([-1]), axis=0)
+                    out_classes = np.append(out_classes, np.asarray([detect_target]), axis=0)
+                    print(f'finish LK, {out_boxes}')
 
         image = yolo.draw_box(out_boxes, out_scores, out_classes, image)
         result = np.asarray(image)
@@ -241,7 +240,8 @@ def detect_video(yolo, video_path, output_path="", detect_target='apple'):
         save_count += 1
         # set pre frame
         pre_frame = frame
-        pre_box = out_boxes[detect_classes.index('apple')]
+        out_classes_list = out_classes.tolist()
+        pre_boxes = [out_boxes[out_classes_list.index(i)] for i in detect_targets]
 
         curr_time = timer()
         exec_time = curr_time - prev_time
