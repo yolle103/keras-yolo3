@@ -144,7 +144,10 @@ class YOLO(object):
             box = out_boxes[i]
             score = out_scores[i]
 
-            label = '{} {:.2f}'.format(predicted_class, score)
+            if score < 0:
+                label = '{} LuKa'.format(predicted_class)
+            else:
+                label = '{} {:.2f}'.format(predicted_class, score)
             draw = ImageDraw.Draw(image)
             label_size = draw.textsize(label, font)
 
@@ -227,7 +230,7 @@ def detect_video(yolo, video_path, output_path="", detect_target='apple'):
                 # TODO need optimization
                 # print(f'shape match? {out_boxes.shape}, {LK_boxes.shape}')
                 out_boxes = np.append(out_boxes, LK_boxes, axis=0)
-                out_scores = np.append(out_scores, np.asarray([2]), axis=0)
+                out_scores = np.append(out_scores, np.asarray([-1]), axis=0)
                 out_classes = np.append(out_classes, np.asarray([47]), axis=0)
                 print(f'finish LK, {out_boxes}')
                 detect_classes = [yolo.class_names[x] for x in out_classes]
