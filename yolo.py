@@ -139,7 +139,7 @@ class YOLO(object):
                     size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
         thickness = (image.size[0] + image.size[1]) // 300
 
-        for i, c in reversed(list(enumerate(out_classes))):
+        for i, c in enumerate(out_classes):
             predicted_class = self.class_names[c]
             box = out_boxes[i]
             score = out_scores[i]
@@ -193,7 +193,7 @@ class YOLO(object):
     def close_session(self):
         self.sess.close()
 
-def detect_video(yolo, video_path, output_path="", detect_targets=[47, 65]):
+def detect_video(yolo, video_path, output_path="", detect_targets=[47, 65, 42]):
     import cv2
     vid = cv2.VideoCapture(video_path)
     if not vid.isOpened():
