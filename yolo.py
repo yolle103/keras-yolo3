@@ -99,7 +99,8 @@ class YOLO(object):
                 score_threshold=self.score, iou_threshold=self.iou)
         return boxes, scores, classes
 
-    def detect_image(self, image):
+    def detect_image(self, image, save_count):
+        import cv2
         start = timer()
 
         if self.model_image_size != (None, None):
@@ -162,6 +163,7 @@ class YOLO(object):
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
 
+        cv2.imwrite(f'temp/{save_count}.jpg', np.asarray(image))
         end = timer()
         print(end - start)
         return image
@@ -170,6 +172,7 @@ class YOLO(object):
         self.sess.close()
 
 def detect_video(yolo, video_path, output_path=""):
+    save_count = 0
     import cv2
     vid = cv2.VideoCapture(video_path)
     if not vid.isOpened():
@@ -189,7 +192,8 @@ def detect_video(yolo, video_path, output_path=""):
     while True:
         return_value, frame = vid.read()
         image = Image.fromarray(frame)
-        image = yolo.detect_image(image)
+        image = yolo.detect_image(image, save_count)
+        save_count += 1
         result = np.asarray(image)
         curr_time = timer()
         exec_time = curr_time - prev_time
